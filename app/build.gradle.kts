@@ -1,3 +1,4 @@
+import java.io.File
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -12,8 +13,12 @@ plugins {
 val releaseProps = Properties().apply {
     val path = System.getenv("JEV_KEYSTORE_PROPS")
     if (!path.isNullOrBlank()) {
-        val f = java.io.File(path)
-        if (f.exists()) f.inputStream().use { load(it) }
+        val f = File(path)
+        if (f.exists()) {
+            FileInputStream(f).use { stream ->
+                load(stream)
+            }
+        }
     }
 }
 
