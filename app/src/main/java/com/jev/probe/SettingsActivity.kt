@@ -101,8 +101,7 @@ class SettingsActivity : AppCompatActivity() {
         val relEdit = edit(prefs.relationship, Prefs.DEFAULT_REL)
         card2.addView(relEdit)
         card2.addView(label("会话白名单（每行一个关键词，空=所有会话）"))
-        val wlEdit = edit(prefs.whitelist.joinToString("
-"), "留空则对所有会话生效").apply {
+        val wlEdit = edit(prefs.whitelist.joinToString("\n"), "留空则对所有会话生效").apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE; minLines = 2
         }
         card2.addView(wlEdit)
@@ -138,8 +137,7 @@ class SettingsActivity : AppCompatActivity() {
             prefs.chatUrl = chatUrlEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_CHAT_URL }
             prefs.replyModel = modelEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_REPLY_MODEL }
             prefs.relationship = relEdit.text.toString().ifBlank { Prefs.DEFAULT_REL }
-            prefs.whitelist = wlEdit.text.toString().split("
-").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+            prefs.whitelist = wlEdit.text.toString().split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             prefs.autoAnalyze = (autoRow.tag as? Boolean) ?: true
             prefs.overlayOpacity = seek.progress + 60
             Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show()
@@ -168,9 +166,7 @@ class SettingsActivity : AppCompatActivity() {
                 val a = client.analyze(demo, prefs.relationship)
                 main.post {
                     result.text = if (a.error != null) "测试失败：${a.error}"
-                    else "✓ 连通成功！
-- 意图判断：${a.trueIntent?.choice ?: "ok"} (耗时 ${a.latencyMs}ms)
-- 候选回复：已生成 ${a.rankedReplies.size} 条 (${model})"
+                    else "✓ 连通成功！\n- 意图判断：${a.trueIntent?.choice ?: "ok"} (耗时 ${a.latencyMs}ms)\n- 候选回复：已生成 ${a.rankedReplies.size} 条 (${model})"
                 }
             }
         })
