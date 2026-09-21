@@ -134,10 +134,20 @@ open class ChatCaptureService : AccessibilityService() {
     private fun runAnalysis() {
         val snapshot = pendingSnapshot ?: return
         if (analyzing) return
-        if (!prefs.hasKey()) { main.post { overlay?.showError("未设置 OpenRouter 密钥，去设置里填") }; return }
+        if (!prefs.hasKey()) {
+            val err = if (prefs.effectiveJevKey.isBlank()) "未设置 Jev 密钥" else "未设置生成模型密钥"
+            main.post { overlay?.showError(err + "，去设置里填") }
+            return
+        }
         analyzing = true
         main.post { overlay?.showLoading() }
-        val client = JevClient(prefs.openRouterKey, prefs.replyModel)
+        val client = JevClient(
+            jevKey = prefs.effectiveJevKey,
+            jevUrl = prefs.effectiveJevUrl,
+            chatKey = prefs.effectiveChatKey,
+            chatUrl = prefs.effectiveChatUrl,
+            replyModel = prefs.replyModel
+        )
         val rel = prefs.relationship
         // Judgment is fast (~1s) — show it immediately.
         submit {

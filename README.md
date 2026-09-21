@@ -87,8 +87,15 @@ adb install -r apk/jev-assistant-v1.0-release.apk
 
 ## 配置与授权
 
-1. 装 APK（见上面「下载安装」，或自己构建），打开「Jev 聊天助手」。
-2. 在**设置**里填你自己的 [OpenRouter](https://openrouter.ai/) API Key（走 `POST /api/alpha/decisions` 调 Jev），选回复生成模型（默认 `deepseek/deepseek-chat-v3.1`；国内 Gemini/OpenAI 会被区域限制）。
+1. 装 APK（见上面「下载安装」，或通过 GitHub Actions 自动构建），打开「Jev 聊天助手」。
+2. 在**设置**里配置双渠道服务：
+   - **Jev (GeV) 意图判断服务**：
+     - 接口地址：默认 https://api.typesafe.ai/v1/systemone（TypeSafe 原生端点）或 OpenRouter。
+     - 密钥：填入你的 Jev / TypeSafe API Key。
+   - **回复生成与润色服务**：
+     - 接口地址：默认 https://api.commandcode.ai/provider/v1/chat/completions（Command Go / OpenAI 兼容端点）。
+     - 密钥：填入你的 Command Go API Key。
+     - 模型：提供快捷切换按钮，支持 **DeepSeek 4.1 Flash** (deepseek/deepseek-v4.1-flash) 与 **Google 3.8 Flash** (google/gemini-3.8-flash)。
 3. 按主页向导开三项权限：
    - **无障碍**（读消息）
    - **悬浮窗 / 显示在其他应用上层**（展示分析）

@@ -51,25 +51,58 @@ class SettingsActivity : AppCompatActivity() {
 
         root.addView(header("设置"))
 
-        // --- 接口 ---
-        root.addView(section("接口"))
-        val card1 = card()
-        card1.addView(label("OpenRouter 密钥"))
-        val keyEdit = edit(prefs.openRouterKey, "sk-or-v1-...", password = true)
-        card1.addView(keyEdit)
-        card1.addView(label("回复生成模型"))
+        // --- Jev 决策服务 ---
+        root.addView(section("Jev (GeV) 意图判断服务"))
+        val cardJev = card()
+        cardJev.addView(text("负责 7 道实时意图与危险度分析、回复排序", 12f, sub))
+        cardJev.addView(label("Jev API 密钥"))
+        val jevKeyEdit = edit(prefs.effectiveJevKey, "填入 Jev / TypeSafe 密钥", password = true)
+        cardJev.addView(jevKeyEdit)
+        cardJev.addView(label("Jev 接口地址"))
+        val jevUrlEdit = edit(prefs.effectiveJevUrl, Prefs.DEFAULT_JEV_URL)
+        cardJev.addView(jevUrlEdit)
+        root.addView(cardJev)
+
+        // --- 回复生成服务 ---
+        root.addView(section("回复生成与润色服务 (Command Go)"))
+        val cardChat = card()
+        cardChat.addView(text("负责起草 3 条不同策略的候选回复", 12f, sub))
+        cardChat.addView(label("生成 API 密钥"))
+        val chatKeyEdit = edit(prefs.effectiveChatKey, "填入 Command Go / OpenAI 兼容密钥", password = true)
+        cardChat.addView(chatKeyEdit)
+        cardChat.addView(label("生成接口地址"))
+        val chatUrlEdit = edit(prefs.effectiveChatUrl, Prefs.DEFAULT_CHAT_URL)
+        cardChat.addView(chatUrlEdit)
+
+        cardChat.addView(label("回复生成模型"))
         val modelEdit = edit(prefs.replyModel, Prefs.DEFAULT_REPLY_MODEL)
-        card1.addView(modelEdit)
-        root.addView(card1)
+
+        // Model quick-switch buttons
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(8), 0, dp(4))
+        }
+        val btnDeepseek = chipBtn("DeepSeek 4.1 Flash") {
+            modelEdit.setText(Prefs.MODEL_DEEPSEEK_4_1_FLASH)
+        }
+        val btnGoogle = chipBtn("Google 3.8 Flash") {
+            modelEdit.setText(Prefs.MODEL_GOOGLE_3_8_FLASH)
+        }
+        btnRow.addView(btnDeepseek)
+        btnRow.addView(btnGoogle)
+        cardChat.addView(btnRow)
+        cardChat.addView(modelEdit)
+        root.addView(cardChat)
 
         // --- 分析 ---
-        root.addView(section("分析"))
+        root.addView(section("分析配置"))
         val card2 = card()
         card2.addView(label("关系描述（给 Jev 判断用）"))
         val relEdit = edit(prefs.relationship, Prefs.DEFAULT_REL)
         card2.addView(relEdit)
         card2.addView(label("会话白名单（每行一个关键词，空=所有会话）"))
-        val wlEdit = edit(prefs.whitelist.joinToString("\n"), "留空则对所有会话生效").apply {
+        val wlEdit = edit(prefs.whitelist.joinToString("
+"), "留空则对所有会话生效").apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE; minLines = 2
         }
         card2.addView(wlEdit)
@@ -99,32 +132,62 @@ class SettingsActivity : AppCompatActivity() {
         // --- Actions ---
         val result = text("", 13f, sub).apply { setPadding(0, dp(12), 0, dp(4)) }
         root.addView(primaryBtn("保存") {
-            prefs.openRouterKey = keyEdit.text.toString()
-            prefs.replyModel = modelEdit.text.toString().ifBlank { Prefs.DEFAULT_REPLY_MODEL }
+            prefs.jevKey = jevKeyEdit.text.toString().trim()
+            prefs.jevUrl = jevUrlEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_JEV_URL }
+            prefs.chatKey = chatKeyEdit.text.toString().trim()
+            prefs.chatUrl = chatUrlEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_CHAT_URL }
+            prefs.replyModel = modelEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_REPLY_MODEL }
             prefs.relationship = relEdit.text.toString().ifBlank { Prefs.DEFAULT_REL }
-            prefs.whitelist = wlEdit.text.toString().split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+            prefs.whitelist = wlEdit.text.toString().split("
+").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             prefs.autoAnalyze = (autoRow.tag as? Boolean) ?: true
             prefs.overlayOpacity = seek.progress + 60
             Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show()
         })
         root.addView(secondaryBtn("连通测试") {
-            val key = keyEdit.text.toString().trim()
+            val jKey = jevKeyEdit.text.toString().trim()
+            val jUrl = jevUrlEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_JEV_URL }
+            val cKey = chatKeyEdit.text.toString().trim()
+            val cUrl = chatUrlEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_CHAT_URL }
             val model = modelEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_REPLY_MODEL }
-            if (key.isBlank()) { result.text = "请先填密钥"; return@secondaryBtn }
-            result.text = "测试中…"
+            if (jKey.isBlank() || cKey.isBlank()) {
+                result.text = "请先填写 Jev 密钥与生成模型密钥"
+                return@secondaryBtn
+            }
+            result.text = "正在测试 Jev 与生成模型连通性…"
             worker.execute {
                 val demo = ChatSnapshot("连通测试", listOf(
                     Msg("other", "在吗？"), Msg("me", "在"), Msg("other", "那你说说昨天答应我的事")))
-                val a = JevClient(key, model).analyze(demo, prefs.relationship)
+                val client = JevClient(
+                    jevKey = jKey,
+                    jevUrl = jUrl,
+                    chatKey = cKey,
+                    chatUrl = cUrl,
+                    replyModel = model
+                )
+                val a = client.analyze(demo, prefs.relationship)
                 main.post {
-                    result.text = if (a.error != null) "失败：${a.error}"
-                    else "成功：意图=${a.trueIntent?.choice ?: "?"}，候选=${a.rankedReplies.size} 条，耗时 ${a.latencyMs}ms"
+                    result.text = if (a.error != null) "测试失败：${a.error}"
+                    else "✓ 连通成功！
+- 意图判断：${a.trueIntent?.choice ?: "ok"} (耗时 ${a.latencyMs}ms)
+- 候选回复：已生成 ${a.rankedReplies.size} 条 (${model})"
                 }
             }
         })
         root.addView(result)
 
         setContentView(scroll)
+    }
+
+    private fun chipBtn(labelText: String, onClick: () -> Unit) = TextView(this).apply {
+        text = labelText; textSize = 12f; gravity = Gravity.CENTER
+        setTextColor(accent); background = round(dp(8), Color.parseColor("#EFF6FF"), stroke = true)
+        setPadding(dp(10), dp(6), dp(10), dp(6))
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            rightMargin = dp(8)
+        }
+        setOnClickListener { onClick() }
     }
 
     private fun toggleRow(labelText: String, initial: Boolean): LinearLayout {
