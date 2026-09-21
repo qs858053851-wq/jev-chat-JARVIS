@@ -124,30 +124,28 @@ class JevClient(
     }
 
     private fun parseChoice(o: JSONObject?): Choice? {
-        if (o == null) return null
-        val choice = o.optString("choice")
-        val conf = o.optDouble("confidence")
-        if (choice.isNullOrBlank()) return null
-        return Choice(choice, if (conf.isNaN()) null else conf)
+        o ?: return null
+        val probs = HashMap<String, Double>()
+        o.optJSONObject("probabilities")?.let { p ->
+            p.keys().forEach { k -> probs[k] = p.optDouble(k) }
+        }
+        return Choice(o.optString("choice"), o.optDouble("confidence", 0.0), probs)
     }
 
     private fun parseScore(o: JSONObject?): Score? {
-        if (o == null) return null
-        val s = o.optInt("score", -1)
-        val r = o.optString("reason")
-        if (s < 0) return null
-        return Score(s, r)
+        o ?: return null
+        val legend = o.optJSONObject("legend")
+        val maxLevel = legend?.keys()?.asSequence()?.mapNotNull { it.toIntOrNull() }?.maxOrNull() ?: 9
+        return Score(o.optDouble("score", 0.0), o.optDouble("confidence", 0.0), maxLevel)
     }
 
-    private fun parseRanked(replyObj: JSONObject?, candidates: List<String>): List<RankedReply> {
-        if (replyObj == null) return candidates.map { RankedReply(it, null) }
-        val probs = replyObj.optJSONObject("probabilities") ?: JSONObject()
-        val mapped = candidates.mapIndexed { idx, text ->
-            val key = ('A' + idx).toString()
-            val prob = probs.optDouble(key)
-            RankedReply(text, if (prob.isNaN()) null else prob)
+    private fun parseRanked(o: JSONObject?, candidates: List<String>): List<RankedReply> {
+        val keys = listOf("reply_a", "reply_b", "reply_c")
+        val probs = o?.optJSONObject("probabilities")
+        val list = candidates.mapIndexed { i, text ->
+            RankedReply(text, probs?.optDouble(keys.getOrElse(i) { "" }, 0.0) ?: 0.0)
         }
-        return mapped.sortedByDescending { it.probability ?: 0.0 }
+        return list.sortedByDescending { it.prob }
     }
 
     private fun postJson(urlStr: String, body: JSONObject, authKey: String): JSONObject {
